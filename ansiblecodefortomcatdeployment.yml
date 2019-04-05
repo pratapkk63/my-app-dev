@@ -1,0 +1,93 @@
+---
+- hosts: node
+  vars:
+  - warName: sample.war
+  - warRemotePath: /root/sample.war
+
+  tasks:
+  - name: Download WAR to server
+    synchronize: src=/root/sample.war dest=/root/tomcat8/apache-tomcat-8.5.38/webapps/sample.war
+	
+  - name: Unzip WAR file
+    unarchive: src=/root/tomcat8/apache-tomcat-8.5.38/webapps/sample.war dest=/var/lib/tomcat7/webapps/ copy=no mode=0755 owner=tomcat7 group=tomcat7
+    notify:
+        - Restart tomcat7
+
+   handlers:
+    - name: Restart tomcat7
+      service: name=tomcat7 state=restarted
+	  
+	  
+	  
+
+
+ - name: Delete remote war file
+    file: path={{ warRemotePath }}/{{ warName }} state=absent	
+
+================================================
+
+### This play deploys a webapp war to an tomcat server
+
+- name: Copy the war file {{ webapp_name }}.war as {{ webapp_name }}.war.tmp to {{ webapp_destination_folder }}
+  win_copy:
+    src: files/{{ webapp_name }}.war
+    dest: "{{ webapp_destination_folder }}\\{{ webapp_name }}.war.tmp"
+    force: yes 
+
+- name: Remove current war file {{ webapp_destination_folder }}\{{ webapp_name }}.war
+  win_file:
+    path: "{{ webapp_destination_folder }}\\{{ webapp_name }}.war"
+    state: absent
+
+- name: Wait until the webapp folder {{ webapp_destination_folder }}\{{ webapp_name }} is deleted
+  win_wait_for:
+    path: "{{ webapp_destination_folder }}\\{{ webapp_name }}xxx"
+    state: absent
+  register: folder_info
+
+- name: rename the {{ webapp_name }}.war.tmp to {{ webapp_name }}.war
+  win_command: "cmd.exe /c rename {{ webapp_destination_folder }}\\{{ webapp_name }}.war.tmp {{ webapp_name }}.war"
+  register: cmd_result 
+
+==============================================
+
+# Deploy a hello world application
+- jboss:
+    src: /tmp/hello-1.0-SNAPSHOT.war
+    deployment: hello.war
+    state: present
+
+# Update the hello world application
+- jboss:
+    src: /tmp/hello-1.1-SNAPSHOT.war
+    deployment: hello.war
+    state: present
+
+# Undeploy the hello world application
+- jboss:
+    deployment: hello.war
+    state: absent
+
+==========================================
+---
+- hosts: tomcatServer
+  vars:
+  - warName: helloworld.war
+  - warRemotePath: /path/to/put/war
+
+  tasks:
+  - name: Download WAR to server
+    synchronize: src={{ warLocalPath }}/{{ warName }} dest={{ warRemotePath }}/{{ warName }}
+
+  - name: Unzip WAR file
+    unarchive: src={{ warRemotePath }}/{{ warName }} dest=/var/lib/tomcat7/webapps/ROOT/ copy=no mode=0755 owner=tomcat7 group=tomcat7
+    notify:
+        - Restart tomcat7
+
+  - name: Delete remote war file
+    file: path={{ warRemotePath }}/{{ warName }} state=absent
+
+  handlers:
+    - name: Restart tomcat7
+      service: name=tomcat7 state=restarted
+==========================================	  
